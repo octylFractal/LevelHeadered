@@ -6,11 +6,6 @@
 plugins {
     `java-gradle-plugin`
     id("com.gradle.plugin-publish") version "2.0.0"
-    id("net.octyl.level-headered") version "0.1.0-SNAPSHOT"
-}
-
-levelHeadered {
-    headerTemplate(rootProject.file("HEADER.txt"))
 }
 
 repositories {

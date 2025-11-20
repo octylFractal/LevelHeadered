@@ -7,11 +7,6 @@ pluginManagement {
     repositories {
         gradlePluginPortal()
         mavenCentral()
-        mavenLocal {
-            mavenContent {
-                includeGroupAndSubgroups("net.octyl.level-headered")
-            }
-        }
     }
 }
 
