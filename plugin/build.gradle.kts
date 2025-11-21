@@ -1,11 +1,12 @@
 /*
  * SPDX-FileCopyrightText: Octavia Togami <octy@octyl.net>
- * SPDX-License-Identifier: AGPL-3.0-or-later
+ * SPDX-License-Identifier: MPL-2.0
  */
 
 plugins {
     `java-gradle-plugin`
     id("com.gradle.plugin-publish") version "2.0.0"
+    id("net.octyl.level-headered") version "0.1.0"
 }
 
 repositories {
@@ -32,6 +33,10 @@ dependencies {
             }
         }
     }
+}
+
+levelHeadered {
+    headerTemplate(rootProject.file("HEADER.txt"))
 }
 
 gradlePlugin {
