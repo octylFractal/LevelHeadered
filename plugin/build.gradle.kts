@@ -6,7 +6,7 @@
 plugins {
     `java-gradle-plugin`
     id("com.gradle.plugin-publish") version "2.0.0"
-    id("net.octyl.level-headered") version "0.1.1"
+    id("net.octyl.level-headered") version "0.1.2"
 }
 
 repositories {
