@@ -6,17 +6,12 @@
 package net.octyl.levelheadered;
 
 import org.gradle.testkit.runner.BuildResult;
-import org.gradle.testkit.runner.GradleRunner;
 import org.gradle.testkit.runner.TaskOutcome;
-import org.intellij.lang.annotations.Language;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.regex.Pattern;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -64,8 +59,10 @@ class WithJavaPluginFunctionalTest extends AbstractFunctionalTest {
          * This is an app that says hello to the world.
          */
         """ + BASE_CONTENT;
+
     private static final String FILE_PATH = "src/main/java/App.java";
     private static final String FILE_PATH_TEST = "src/test/java/App.java";
+    private static final String CUSTOM_HEADERED_FILE_PATH = "src/main/java/CustomHeaderedFile.java";
 
     enum TestCase {
         BASE(BASE_CONTENT, WITH_HEADER_CONTENT),
@@ -99,11 +96,11 @@ class WithJavaPluginFunctionalTest extends AbstractFunctionalTest {
 
         BuildResult result = createGradleRunner("applyHeader", "-iS").build();
         assertThat(result.getOutput()).containsMatch(
-            "Processing ADDED file: .*/" + Pattern.quote(FILE_PATH)
+            "Processing ADDED file: .*" + quotedFilePath("/" + FILE_PATH)
         );
 
         String modifiedContent = Files.readString(projectDir.resolve(FILE_PATH));
-        assertThat(modifiedContent).isEqualTo(testCase.withHeader);
+        assertThat(modifiedContent).isEqualTo(withLocalLineSep(testCase.withHeader));
 
         // It takes one extra cycle to get to UP_TO_DATE, as we change the file (which is an input) in the first run.
         result = createGradleRunner("applyHeader", "-iS").build();
@@ -111,17 +108,19 @@ class WithJavaPluginFunctionalTest extends AbstractFunctionalTest {
         result = createGradleRunner("applyHeader", "-iS").build();
         assertThat(result.task(":applyHeader").getOutcome()).isEqualTo(TaskOutcome.UP_TO_DATE);
         // Verify content is unchanged
-        assertThat(modifiedContent).isEqualTo(testCase.withHeader);
+        assertThat(modifiedContent).isEqualTo(withLocalLineSep(testCase.withHeader));
         // Verify test file is not yet modified
-        assertThat(Files.readString(projectDir.resolve(FILE_PATH_TEST))).isEqualTo(testCase.withoutHeader);
+        assertThat(Files.readString(projectDir.resolve(FILE_PATH_TEST))).isEqualTo(withLocalLineSep(
+            testCase.withoutHeader
+        ));
 
         // Now apply header to test sources
         result = createGradleRunner("applyTestHeader", "-iS").build();
         assertThat(result.getOutput()).containsMatch(
-            "Processing ADDED file: .*/" + Pattern.quote(FILE_PATH_TEST)
+            "Processing ADDED file: .*" + quotedFilePath("/" + FILE_PATH_TEST)
         );
         modifiedContent = Files.readString(projectDir.resolve(FILE_PATH_TEST));
-        assertThat(modifiedContent).isEqualTo(testCase.withHeader);
+        assertThat(modifiedContent).isEqualTo(withLocalLineSep(testCase.withHeader));
     }
 
     @ParameterizedTest
@@ -143,7 +142,7 @@ class WithJavaPluginFunctionalTest extends AbstractFunctionalTest {
         BuildResult result = createGradleRunner("verifyHeader", "-iS").build();
         assertThat(result.task(":verifyHeader").getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
         assertThat(result.getOutput()).containsMatch(
-            "Processing ADDED file: .*/" + Pattern.quote(FILE_PATH)
+            "Processing ADDED file: .*" + quotedFilePath("/" + FILE_PATH)
         );
 
         result = createGradleRunner("verifyHeader", "-iS").build();
@@ -169,8 +168,13 @@ class WithJavaPluginFunctionalTest extends AbstractFunctionalTest {
         BuildResult result = createGradleRunner("verifyHeader", "-iS").buildAndFail();
         assertThat(result.task(":verifyHeader").getOutcome()).isEqualTo(TaskOutcome.FAILED);
         assertThat(result.getOutput()).containsMatch(
-            "Header verification failed for file: .*/" + Pattern.quote(FILE_PATH) +
-                "\\. Run the :applyHeader task to fix this\\."
+            "Header verification failed for file: .*" + quotedFilePath("/" + FILE_PATH)
+        );
+        assertThat(withoutLocalLineSep(result.getOutput())).contains(
+            """
+            * Try:
+            > Run the :applyHeader task to fix this.
+            """
         );
     }
 
@@ -194,13 +198,12 @@ class WithJavaPluginFunctionalTest extends AbstractFunctionalTest {
         BuildResult result = createGradleRunner("verifyHeader", "-iS").build();
         assertThat(result.task(":verifyHeader").getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
         assertThat(result.getOutput()).containsMatch(
-            "Processing ADDED file: .*/" + Pattern.quote(FILE_PATH)
+            "Processing ADDED file: .*" + quotedFilePath("/" + FILE_PATH)
         );
-        assertThat(result.getOutput()).doesNotContain(
-            "Processing ADDED file: .*/" + Pattern.quote(FILE_PATH_TEST)
+        assertThat(result.getOutput()).doesNotContainMatch(
+            "Processing ADDED file: .*" + quotedFilePath("/" + FILE_PATH_TEST)
         );
     }
-
 
     @ParameterizedTest
     @EnumSource(TestCase.class)
@@ -220,21 +223,23 @@ class WithJavaPluginFunctionalTest extends AbstractFunctionalTest {
             """.formatted(HEADER_TEXT_AS_EMBEDDABLE_STRING)
         );
         writeFile(projectDir.resolve(FILE_PATH), testCase.withoutHeader);
-        writeFile(projectDir.resolve("src/main/java/CustomHeaderedFile.java"), testCase.withoutHeader);
+        writeFile(projectDir.resolve(CUSTOM_HEADERED_FILE_PATH), testCase.withoutHeader);
 
         BuildResult result = createGradleRunner("applyHeader", "-iS").build();
         assertThat(result.task(":applyHeader").getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
         assertThat(result.getOutput()).containsMatch(
-            "Processing ADDED file: .*/" + Pattern.quote(FILE_PATH)
+            "Processing ADDED file: .*" + quotedFilePath("/" + FILE_PATH)
         );
-        assertThat(result.getOutput()).doesNotContain(
-            "Processing ADDED file: .*/" + Pattern.quote("src/main/java/CustomHeaderedFile.java")
+        assertThat(result.getOutput()).doesNotContainMatch(
+            "Processing ADDED file: .*" + quotedFilePath("/" + CUSTOM_HEADERED_FILE_PATH)
         );
 
-        assertThat(Files.readString(projectDir.resolve(FILE_PATH))).isEqualTo(testCase.withHeader);
-        assertThat(Files.readString(projectDir.resolve("src/main/java/CustomHeaderedFile.java")))
-            .isEqualTo(testCase.withoutHeader);
+        assertThat(Files.readString(projectDir.resolve(FILE_PATH))).isEqualTo(withLocalLineSep(testCase.withHeader));
+        assertThat(Files.readString(projectDir.resolve(CUSTOM_HEADERED_FILE_PATH))).isEqualTo(withLocalLineSep(
+            testCase.withoutHeader
+        ));
     }
+
     @ParameterizedTest
     @EnumSource(TestCase.class)
     void onlyVerifiesApplicableFiles(TestCase testCase) throws IOException {
@@ -253,15 +258,15 @@ class WithJavaPluginFunctionalTest extends AbstractFunctionalTest {
             """.formatted(HEADER_TEXT_AS_EMBEDDABLE_STRING)
         );
         writeFile(projectDir.resolve(FILE_PATH), testCase.withHeader);
-        writeFile(projectDir.resolve("src/main/java/CustomHeaderedFile.java"), testCase.withoutHeader);
+        writeFile(projectDir.resolve(CUSTOM_HEADERED_FILE_PATH), testCase.withoutHeader);
 
         BuildResult result = createGradleRunner("verifyHeader", "-iS").build();
         assertThat(result.task(":verifyHeader").getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
         assertThat(result.getOutput()).containsMatch(
-            "Processing ADDED file: .*/" + Pattern.quote(FILE_PATH)
+            "Processing ADDED file: .*" + quotedFilePath("/" + FILE_PATH)
         );
-        assertThat(result.getOutput()).doesNotContain(
-            "Processing ADDED file: .*/" + Pattern.quote("src/main/java/CustomHeaderedFile.java")
+        assertThat(result.getOutput()).doesNotContainMatch(
+            "Processing ADDED file: .*" + quotedFilePath("/" + CUSTOM_HEADERED_FILE_PATH)
         );
     }
 }

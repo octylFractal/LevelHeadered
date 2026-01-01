@@ -17,6 +17,48 @@ import org.jspecify.annotations.Nullable;
  */
 public interface FileHeaderRewriter {
     /**
+     * Detects the line ending used in the given content, from either LF or CRLF.
+     * If multiple line endings are used, an error is thrown.
+     * If no line endings are found, {@link System#lineSeparator()} is returned.
+     *
+     * @param content the content to analyze
+     * @return the detected line ending
+     * @throws IllegalArgumentException if multiple line endings are detected
+     */
+    static String detectLineEnding(String content) {
+        enum LineEnding {
+            UNKNOWN,
+            LF,
+            CRLF
+        }
+
+        var lineEnding = LineEnding.UNKNOWN;
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+            if (c == '\n') {
+                if (i > 0 && content.charAt(i - 1) == '\r') {
+                    // CRLF
+                    if (lineEnding == LineEnding.LF) {
+                        throw new IllegalArgumentException("Multiple line endings detected in content");
+                    }
+                    lineEnding = LineEnding.CRLF;
+                } else {
+                    // LF
+                    if (lineEnding == LineEnding.CRLF) {
+                        throw new IllegalArgumentException("Multiple line endings detected in content");
+                    }
+                    lineEnding = LineEnding.LF;
+                }
+            }
+        }
+        return switch (lineEnding) {
+            case UNKNOWN -> System.lineSeparator();
+            case LF -> "\n";
+            case CRLF -> "\r\n";
+        };
+    }
+
+    /**
      * Rewrites the header of the given file content to the specified header text, if needed.
      *
      * @param fileContent the content of the file

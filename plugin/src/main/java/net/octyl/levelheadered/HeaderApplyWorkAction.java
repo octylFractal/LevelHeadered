@@ -5,9 +5,14 @@
 
 package net.octyl.levelheadered;
 
+import net.octyl.levelheadered.internal.Constants;
 import net.octyl.levelheadered.internal.HeaderWorkParameters;
 import net.octyl.levelheadered.rewriter.FileHeaderRewriter;
 import net.octyl.levelheadered.rewriter.ModificationWriter;
+import org.gradle.api.problems.ProblemGroup;
+import org.gradle.api.problems.ProblemId;
+import org.gradle.api.problems.Problems;
+import org.gradle.api.problems.Severity;
 import org.gradle.workers.WorkAction;
 
 import javax.inject.Inject;
@@ -18,9 +23,19 @@ abstract class HeaderApplyWorkAction implements WorkAction<HeaderApplyWorkAction
     public interface Parameters extends HeaderWorkParameters {
     }
 
+    private static final ProblemGroup PROBLEM_GROUP = ProblemGroup.create(
+        "header-application", "Header Application Problems", Constants.PROBLEM_GROUP
+    );
+    private static final ProblemId FAILED_TO_APPLY_HEADER = ProblemId.create(
+        "failed-to-apply-header", "Failed to apply header", PROBLEM_GROUP
+    );
+
     @Inject
     public HeaderApplyWorkAction() {
     }
+
+    @Inject
+    protected abstract Problems getProblems();
 
     @Override
     public void execute() {
@@ -38,7 +53,14 @@ abstract class HeaderApplyWorkAction implements WorkAction<HeaderApplyWorkAction
                 modificationWriter.writeTo(writer);
             }
         } catch (Exception e) {
-            throw new RuntimeException("Failed to apply header to file: " + sourceFilePath, e);
+            throw getProblems().getReporter().throwing(
+                e,
+                FAILED_TO_APPLY_HEADER,
+                spec -> spec
+                    .details("File: " + sourceFilePath)
+                    .severity(Severity.ERROR)
+                    .withException(e)
+            );
         }
     }
 }

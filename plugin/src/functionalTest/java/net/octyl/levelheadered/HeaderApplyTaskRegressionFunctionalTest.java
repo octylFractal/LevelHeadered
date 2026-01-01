@@ -48,7 +48,7 @@ class HeaderApplyTaskRegressionFunctionalTest extends AbstractFunctionalTest {
         BuildTask task = result.task(":applyHeader");
         assertThat(task).isNotNull();
         assertThat(task.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
-        assertThat(Files.readString(projectDir.resolve("src/main/java/App.java"))).isEqualTo(
+        assertThat(Files.readString(projectDir.resolve("src/main/java/App.java"))).isEqualTo(withLocalLineSep(
             """
             /*
              * My custom header with surrounding whitespace
@@ -60,7 +60,7 @@ class HeaderApplyTaskRegressionFunctionalTest extends AbstractFunctionalTest {
                 }
             }
             """
-        );
+        ));
     }
 
     @Test
@@ -92,7 +92,7 @@ class HeaderApplyTaskRegressionFunctionalTest extends AbstractFunctionalTest {
         BuildTask task = result.task(":applyHeader");
         assertThat(task).isNotNull();
         assertThat(task.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
-        assertThat(Files.readString(projectDir.resolve("src/main/java/App.java"))).isEqualTo(
+        assertThat(Files.readString(projectDir.resolve("src/main/java/App.java"))).isEqualTo(withLocalLineSep(
             """
             /*
              * My custom header with trailing whitespace
@@ -106,7 +106,7 @@ class HeaderApplyTaskRegressionFunctionalTest extends AbstractFunctionalTest {
                 }
             }
             """
-        );
+        ));
     }
 
     @Test
@@ -141,7 +141,7 @@ class HeaderApplyTaskRegressionFunctionalTest extends AbstractFunctionalTest {
         BuildTask task = result.task(":applyHeader");
         assertThat(task).isNotNull();
         assertThat(task.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
-        assertThat(Files.readString(projectDir.resolve("src/main/java/App.java"))).isEqualTo(
+        assertThat(Files.readString(projectDir.resolve("src/main/java/App.java"))).isEqualTo(withLocalLineSep(
             """
             /*
              * A header
@@ -156,6 +156,60 @@ class HeaderApplyTaskRegressionFunctionalTest extends AbstractFunctionalTest {
                 }
             }
             """
+        ));
+    }
+
+    @Test
+    void failsOnMixedLineEndings() throws IOException {
+        settingsFile("");
+        buildFile(
+            """
+            plugins {
+                java
+                id("net.octyl.level-headered")
+            }
+            
+            levelHeadered.headerTemplate("A header")
+            """
+        );
+
+        Files.createDirectories(projectDir.resolve("src/main/java"));
+        Files.writeString(
+            projectDir.resolve("src/main/java/App.java"),
+            """
+            public class App {\r
+                // No CR here ->
+            }\r
+            """
+        );
+        Files.writeString(
+            projectDir.resolve("src/main/java/AppSwapped.java"),
+            """
+            public class App {
+                // Only CR here ->\r
+            }
+            """
+        );
+
+        BuildResult result = createGradleRunner("applyHeader").buildAndFail();
+        BuildTask task = result.task(":applyHeader");
+        assertThat(task).isNotNull();
+        assertThat(task.getOutcome()).isEqualTo(TaskOutcome.FAILED);
+        assertThat(withoutLocalLineSep(result.getOutput())).containsMatch(
+            """
+               > A failure occurred while executing net\\.octyl\\.levelheadered\\.HeaderApplyWorkAction
+                  > Failed to apply header
+                      Multiple line endings detected in content
+                        File: .+%s
+            """.formatted(quotedFilePath("src/main/java/App.java"))
+        );
+        assertThat(withoutLocalLineSep(result.getOutput())).containsMatch(
+            """
+               > A failure occurred while executing net\\.octyl\\.levelheadered\\.HeaderApplyWorkAction
+                  > Failed to apply header
+                      Multiple line endings detected in content
+                        File: .+%s
+            """.formatted(quotedFilePath("src/main/java/AppSwapped.java"))
         );
     }
 }

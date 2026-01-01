@@ -100,3 +100,7 @@ tasks.javadoc {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
+
+tasks.withType<Test>().configureEach {
+    maxParallelForks = Integer.MAX_VALUE
+}

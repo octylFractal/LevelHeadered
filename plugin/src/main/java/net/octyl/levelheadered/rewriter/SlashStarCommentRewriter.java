@@ -8,19 +8,20 @@ package net.octyl.levelheadered.rewriter;
 import org.jspecify.annotations.Nullable;
 
 final class SlashStarCommentRewriter implements StandardFileHeaderRewriter {
-    private static String makeSlashStarComment(String headerText) {
+    private static String makeSlashStarComment(String newline, String headerText) {
         StringBuilder commentBuilder = new StringBuilder();
-        commentBuilder.append("/*\n");
+        commentBuilder.append("/*").append(newline);
+        // The header text is not split by `newline` as it comes normalized from the user input.
         String[] lines = headerText.strip().split("\n", -1);
         for (String line : lines) {
             if (line.contains("*/")) {
                 throw new IllegalArgumentException("Header text cannot contain '*/' sequence");
             }
             if (line.isBlank()) {
-                commentBuilder.append(" *\n");
+                commentBuilder.append(" *").append(newline);
                 continue;
             }
-            commentBuilder.append(" * ").append(line.stripTrailing()).append("\n");
+            commentBuilder.append(" * ").append(line.stripTrailing()).append(newline);
         }
         commentBuilder.append(" */");
         return commentBuilder.toString();
@@ -29,7 +30,8 @@ final class SlashStarCommentRewriter implements StandardFileHeaderRewriter {
     @Override
     @Nullable
     public ModificationWriter rewriteHeader(String fileContent, String headerText) {
-        String headerTextAsComment = makeSlashStarComment(headerText);
+        String newline = FileHeaderRewriter.detectLineEnding(fileContent);
+        String headerTextAsComment = makeSlashStarComment(newline, headerText);
         int indexOfFirstNonWhitespace = RewriteUtil.getIndexOfFirstNonWhitespaceChar(fileContent);
         if (indexOfFirstNonWhitespace == -1) {
             // empty file, just insert the header at the start
@@ -50,7 +52,7 @@ final class SlashStarCommentRewriter implements StandardFileHeaderRewriter {
                 // Insert the new header before the existing javadoc comment, with newline inbetween
                 return appendable -> {
                     appendable.append(fileContent, 0, indexOfFirstNonWhitespace);
-                    appendable.append(headerTextAsComment).append("\n\n");
+                    appendable.append(headerTextAsComment).append(newline).append(newline);
                     appendable.append(fileContent, indexOfFirstNonWhitespace, fileContent.length());
                 };
             }
@@ -66,7 +68,7 @@ final class SlashStarCommentRewriter implements StandardFileHeaderRewriter {
                 // Unclosed comment, just insert the new header before it, with newline inbetween
                 return appendable -> {
                     appendable.append(fileContent, 0, indexOfFirstNonWhitespace);
-                    appendable.append(headerTextAsComment).append("\n\n");
+                    appendable.append(headerTextAsComment).append(newline).append(newline);
                     appendable.append(fileContent, indexOfFirstNonWhitespace, fileContent.length());
                 };
             }
@@ -75,12 +77,12 @@ final class SlashStarCommentRewriter implements StandardFileHeaderRewriter {
         // Add a blank line if there is none in the whitespace
         boolean addBlankLine = true;
         for (int i = 0; i < indexOfFirstNonWhitespace; i++) {
-            if (fileContent.charAt(i) == '\n') {
+            if (fileContent.startsWith(newline, i)) {
                 addBlankLine = false;
                 break;
             }
         }
-        String newlines = addBlankLine ? "\n\n" : "\n";
+        String newlines = addBlankLine ? newline + newline : newline;
         return appendable -> {
             appendable.append(headerTextAsComment).append(newlines);
             appendable.append(fileContent);
